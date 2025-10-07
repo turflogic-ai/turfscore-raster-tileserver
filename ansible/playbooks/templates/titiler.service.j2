@@ -1,0 +1,17 @@
+[Unit]
+Description=Turfscore Raster Tile Server (TiTiler)
+After=network.target
+
+[Service]
+User=titiler
+Group=titiler
+WorkingDirectory={{ project_dir }}
+Environment="PATH={{ venv_dir }}/bin"
+EnvironmentFile={{ project_dir }}/.env
+ExecStart=/bin/bash -c 'cd {{ project_dir }} && exec {{ venv_dir }}/bin/gunicorn -k uvicorn.workers.UvicornWorker titiler.application.main:app --bind 127.0.0.1:8000 --timeout 300'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,49 @@
+---
+- name: Configure Git and Deploy Tile Server Application
+  hosts: all
+  become: true
+  vars:
+    project_dir: '/home/{{ webapp_user }}/turfscore'
+    venv_dir: '/home/{{ webapp_user }}/turfscore/.venv'
+  tasks:
+    - name: Ensure git is installed
+      apt:
+        name: git
+        state: present
+
+    - name: Ensure project directory exists
+      file:
+        path: '{{ project_dir }}'
+        state: directory
+        owner: '{{ webapp_user }}'
+        group: '{{ webapp_user }}'
+        mode: '0755'
+
+    - name: Copy deploy private key
+      copy:
+        src: '~/.ssh/deploy_key'
+        dest: /home/{{ webapp_user }}/.ssh/deploy_key
+        owner: '{{ webapp_user }}'
+        group: '{{ webapp_user }}'
+        mode: '0600'
+
+    - name: Ensure SSH config for deploy key
+      copy:
+        dest: /home/{{ webapp_user }}/.ssh/config
+        content: |
+          Host github.com
+            IdentityFile ~/.ssh/deploy_key
+            User git
+            StrictHostKeyChecking no
+        owner: '{{ webapp_user }}'
+        group: '{{ webapp_user }}'
+        mode: '0600'
+
+    - name: Clone repository if not present
+      git:
+        repo: '{{ repo_url }}'
+        dest: '{{ project_dir }}'
+        update: yes
+        force: yes
+        accept_hostkey: yes
+      become_user: '{{ webapp_user }}'

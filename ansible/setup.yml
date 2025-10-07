@@ -1,0 +1,22 @@
+---
+- name: Turfscore raster tile server config
+  hosts: all
+  gather_facts: yes
+  tasks:
+    - name: Display infrastructure configuration start
+      debug:
+        msg: 'Starting Turfscore raster tile server config...'
+
+- import_playbook: playbooks/setup-linode.yml
+
+- import_playbook: playbooks/install-libraries.yml
+
+- import_playbook: playbooks/configure-git.yml
+
+- name: Turfscore raster tile server config
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Display infrastructure configuration completion
+      debug:
+        msg: 'Turfscore raster tile server config finished successfully!'

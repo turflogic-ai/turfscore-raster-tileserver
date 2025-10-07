@@ -1,0 +1,18 @@
+---
+all:
+  vars:
+    webapp_user: titiler
+    webapp_group: titiler
+    project_path: /home/titiler/turfscore
+    venv_path: "{{ project_path }}/.venv"
+    timezone: UTC
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_user: root
+    ansible_ssh_private_key_file: ~/.ssh/id_rsa
+    repo_url: 'git@github.com:turflogic-ai/turfscore-raster-tileserver.git'
+  children:
+    linode_servers:
+      hosts:
+        production:
+          ansible_host: 45.79.22.142
+          hostname: turfscore-raster-tileserver

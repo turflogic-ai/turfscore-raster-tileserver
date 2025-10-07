@@ -1,0 +1,90 @@
+---
+- name: Configure Nginx reverse proxy for TiTiler
+  hosts: all
+  become: true
+  vars:
+    domain_name: "tiles.turfscore.ai"
+
+    # Match existing playbook convention for cert locations
+    ssl_cert_local: "{{ playbook_dir }}/../../../ssl/cloudflare-turfscore.crt"
+    ssl_key_local: "{{ playbook_dir }}/../../../ssl/cloudflare-turfscore.key"
+
+    # Remote destinations on Linode
+    ssl_cert_dest: "/etc/ssl/certs/cloudflare-origin.crt"
+    ssl_key_dest: "/etc/ssl/private/cloudflare-origin.key"
+
+    # Template source and destination
+    nginx_conf_src: "{{ playbook_dir }}/templates/nginx.conf.j2"
+    nginx_conf_dest: "/etc/nginx/sites-available/titiler.conf"
+
+  tasks:
+    - name: Ensure Nginx is installed
+      apt:
+        name: nginx
+        state: present
+        update_cache: true
+
+    - name: Ensure SSL directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /etc/ssl/certs
+        - /etc/ssl/private
+
+    - name: Copy Cloudflare Origin Certificate from local
+      copy:
+        src: "{{ ssl_cert_local }}"
+        dest: "{{ ssl_cert_dest }}"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Copy Cloudflare Origin Key from local
+      copy:
+        src: "{{ ssl_key_local }}"
+        dest: "{{ ssl_key_dest }}"
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Deploy Nginx configuration from template
+      template:
+        src: "{{ nginx_conf_src }}"
+        dest: "{{ nginx_conf_dest }}"
+        mode: '0644'
+      notify: reload nginx
+
+    - name: Enable TiTiler site
+      file:
+        src: "{{ nginx_conf_dest }}"
+        dest: "/etc/nginx/sites-enabled/titiler.conf"
+        state: link
+        force: true
+      notify: reload nginx
+
+    - name: Remove default Nginx site
+      file:
+        path: "/etc/nginx/sites-enabled/default"
+        state: absent
+      notify: reload nginx
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+      failed_when: nginx_test.rc != 0
+
+    - name: Ensure Nginx is running and enabled
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+  handlers:
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded
+

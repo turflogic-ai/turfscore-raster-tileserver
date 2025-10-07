@@ -1,0 +1,88 @@
+# Redirect HTTP → HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name tiles.turfscore.ai;
+
+    # Use $host + $request_uri to avoid double slashes in redirects
+    return 301 https://$host$request_uri;
+}
+
+# Main HTTPS TiTiler reverse proxy
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name tiles.turfscore.ai;
+
+    # Cloudflare Origin Certificates
+    ssl_certificate     /etc/ssl/certs/cloudflare-origin.crt;
+    ssl_certificate_key /etc/ssl/private/cloudflare-origin.key;
+
+    # SSL performance and security
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # Logging
+    access_log /var/log/nginx/titiler_access.log;
+    error_log  /var/log/nginx/titiler_error.log;
+
+    # Security headers (consistent with Django config)
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+
+    # Proxy TiTiler API
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
+        client_max_body_size 100M;
+    }
+
+    # Cache tile responses for 1 hour
+    location ~* /cog/tiles/ {
+        expires 1h;
+        add_header Cache-Control "public, max-age=3600";
+    }
+
+    # Gzip compression for JSON and imagery
+    gzip on;
+    gzip_types application/json image/png image/jpeg;
+    gzip_min_length 256;
+}
+
+# Default HTTP server — drop invalid Host headers
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    location / {
+        if ($host !~* ^(tiles\.turfscore\.ai)$) {
+            return 444;
+        }
+    }
+}
+
+# Default HTTPS server — drop invalid Host headers
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+
+    ssl_certificate     /etc/ssl/certs/cloudflare-origin.crt;
+    ssl_certificate_key /etc/ssl/private/cloudflare-origin.key;
+
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    location / {
+        if ($host !~* ^(tiles\.turfscore\.ai)$) {
+            return 444;
+        }
+    }
+}

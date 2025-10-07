@@ -1,0 +1,85 @@
+---
+- name: Setup TiTiler Raster Tile Server (Turfscore)
+  hosts: all
+  become: true
+  vars:
+    app_name: "turfscore-tileserver"
+    service_name: "turfscore-tileserver"
+    project_dir: "/home/titiler/turfscore"
+    venv_dir: "{{ project_dir }}/.venv"
+    cache_dir: "{{ project_dir }}/cache"
+    python_bin: "/usr/bin/python3.12"
+    systemd_service_path: "/etc/systemd/system/{{ service_name }}.service"
+
+  tasks:
+    - name: Check Python 3.12 availability
+      command: "{{ python_bin }} --version"
+      register: python_check
+      failed_when: python_check.rc != 0
+      changed_when: false
+
+    - name: Ensure project directory exists
+      file:
+        path: "{{ project_dir }}"
+        state: directory
+        owner: titiler
+        group: titiler
+        mode: "0755"
+
+    - name: Create virtual environment with system Python 3.12
+      command: "{{ python_bin }} -m venv {{ venv_dir }}"
+      args:
+        creates: "{{ venv_dir }}/bin/activate"
+
+    - name: Verify virtualenv exists
+      stat:
+        path: "{{ venv_dir }}/bin/activate"
+      register: venv_check
+
+    - name: Fail if virtualenv creation failed
+      fail:
+        msg: "Virtual environment was not created successfully"
+      when: not venv_check.stat.exists
+
+    - name: Install TiTiler and dependencies into venv
+      command: >
+        {{ venv_dir }}/bin/pip install --upgrade pip
+        titiler[server]
+        gunicorn
+        uvicorn
+        python-dotenv
+      args:
+        chdir: "{{ project_dir }}"
+
+    - name: Ensure tile cache directory exists
+      file:
+        path: "{{ cache_dir }}"
+        state: directory
+        owner: titiler
+        group: titiler
+        mode: "0755"
+
+    - name: Deploy TiTiler systemd service from template
+      template:
+        src: "{{ playbook_dir }}/templates/titiler.service.j2"
+        dest: "{{ systemd_service_path }}"
+        mode: "0644"
+
+    - name: Force immediate systemd reload after service file update
+      command: systemctl daemon-reload
+
+    - name: Restart TiTiler service to apply changes
+      systemd:
+        name: "{{ service_name }}"
+        state: restarted
+        enabled: true
+
+    - name: Display TiTiler service status
+      command: systemctl status {{ service_name }}
+      register: titiler_status
+      changed_when: false
+
+    - debug:
+        var: titiler_status.stdout_lines
+
+
