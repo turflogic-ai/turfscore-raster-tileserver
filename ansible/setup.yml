@@ -13,6 +13,10 @@
 
 - import_playbook: playbooks/configure-git.yml
 
+- import_playbook: playbooks/setup-titiler.yml
+
+- import_playbook: playbooks/configure-nginx.yml
+
 - name: Turfscore raster tile server config
   hosts: all
   gather_facts: no

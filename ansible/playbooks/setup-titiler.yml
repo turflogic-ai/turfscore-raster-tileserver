@@ -59,6 +59,14 @@
         group: titiler
         mode: "0755"
 
+    - name: Deploy main.py application file from template
+      template:
+        src: "{{ playbook_dir }}/templates/main.py.j2"
+        dest: "{{ project_dir }}/main.py"
+        owner: titiler
+        group: titiler
+        mode: "0644"
+
     - name: Deploy TiTiler systemd service from template
       template:
         src: "{{ playbook_dir }}/templates/titiler.service.j2"
