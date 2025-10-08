@@ -48,6 +48,7 @@
         gunicorn
         uvicorn
         python-dotenv
+        sentry-sdk[fastapi]
       args:
         chdir: "{{ project_dir }}"
 
@@ -59,9 +60,26 @@
         group: titiler
         mode: "0755"
 
-    - name: Deploy main.py application file from template
-      template:
-        src: "{{ playbook_dir }}/templates/main.py.j2"
+    - name: Check if .env file exists
+      stat:
+        path: "{{ project_dir }}/.env"
+      register: env_file
+
+    - name: Create .env file for environment variables (if it doesn't exist)
+      copy:
+        content: |
+          # Sentry Configuration
+          SENTRY_DSN={{ sentry_dsn | default('') }}
+          ENVIRONMENT={{ environment | default('production') }}
+        dest: "{{ project_dir }}/.env"
+        owner: titiler
+        group: titiler
+        mode: "0644"
+      when: not env_file.stat.exists
+
+    - name: Copy main.py application file
+      copy:
+        src: "{{ playbook_dir }}/../../main.py"
         dest: "{{ project_dir }}/main.py"
         owner: titiler
         group: titiler
